@@ -11,11 +11,7 @@ import html5lib
 CITY = ''
 WORK = ''
 NUM = ''
-AK = ['93c85a8c660003ff2fd31b31124aa54e',
-        'dbf442a9a40409c020ff962e3af9fec1',
-        '0dd6021c09bae0e5e424b92a3b20f164',
-        '8c74fbf8d2975690fe9974891dc2c0b5',
-        'f62f104698bf146e67b65439892a2f3b'] # 加入ak码
+AK = [] # 加入ak码
 MONEY = ''
 JULI = ''
 HOMES = '' # 查询公寓页数
