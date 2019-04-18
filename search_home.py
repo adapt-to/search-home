@@ -20,7 +20,7 @@ HOUSE_NUMBER = 0 # 记录检索到的房子数目
 MYHOUSE_NUMBER = 0 # 符合要求的房子数目
 HOUSE_NUMBER_SET = 0 # 查找的公寓数量（一页20个还是太多了，可以在这里筛选）
 starttime = ''
-from juli_style_relode import *
+from juli_style import *
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
 except AttributeError:
