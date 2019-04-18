@@ -25,6 +25,10 @@ HOUSE_NUMBER_SET = 0 # 查找的公寓数量（一页20个还是太多了，可�
 starttime = ''
 proxys_use = list()
 from juli_style import *
+
+##############
+# 代码没有重新整理，见谅
+##############
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
 except AttributeError:
@@ -69,7 +73,7 @@ class slot_con(QtGui.QWidget, Ui_Form):
             raise RuntimeError
     def Haversine(self, add_1, add_2,ak):
         # lon1, lat1, lon2, lat2 分别代表：经度1，纬度1，经度2，纬度2
-        try:
+        try: # 这里异常获取的时ak码额度不够时会返回错误，因为测试时使用了5个ak码，此处用了5个异常处理。当然也可以用递归来实现。不过觉得在函数中写函数再递归有点别扭
             lon1, lat1 = self.search_coordinate(add_1,ak[0])
             lon2, lat2 = self.search_coordinate(add_2,ak[0])
         except RuntimeError:
