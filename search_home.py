@@ -1,17 +1,20 @@
 #coding:utf-8
 from bs4 import BeautifulSoup
 import requests
+import os
 import sys
 import time
 from math import radians, cos, sin, asin, sqrt
 import threading
 import html5lib
-# 需要安装lxml库
+import random
+# 需要安装lxml库 pip install lxml
 # 全局变量
+lock = threading.Lock()
 CITY = ''
 WORK = ''
 NUM = ''
-AK = [] # 加入ak码
+AK = [] # 加入你自己申请的ak码，放入该列表中
 MONEY = ''
 JULI = ''
 HOMES = '' # 查询公寓页数
@@ -20,6 +23,7 @@ HOUSE_NUMBER = 0 # 记录检索到的房子数目
 MYHOUSE_NUMBER = 0 # 符合要求的房子数目
 HOUSE_NUMBER_SET = 0 # 查找的公寓数量（一页20个还是太多了，可以在这里筛选）
 starttime = ''
+proxys_use = list()
 from juli_style import *
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -49,11 +53,8 @@ class slot_con(QtGui.QWidget, Ui_Form):
         self.lineEdit_homes.setPlaceholderText('填入页数')
         self.lineEdit_HOUSE_NUMBER_SET.setPlaceholderText('若20太多则写其他数字')
         self.lineEdit_houses.setPlaceholderText('查找的房型页数')
-        self.progressBar_play.setRange(0, 100)
+        #self.progressBar_play.setRange(0, 100)
         self.step = 0
-        #self.timer = QtCore.QBasicTimer()
-        #pixMap = QtGui.QPixmap("wechat.png").scaled(self.label.width(), self.label.height())
-        #self.label_img.setPixmap(pixMap)
 
     def search_coordinate(self, address,ak):
         parameters = {'address': address, 'key': ak}
@@ -101,14 +102,79 @@ class slot_con(QtGui.QWidget, Ui_Form):
         d = '%0.4f' %(c * r) # 保留3位小数
         #print("两点间直线相距：{}km".format(d))
         return d
+
+    def fetch_proxy(self,num=8): # 默认选8页的ip
+        lock.acquire()
+        #修改当前工作文件夹
+        #os.chdir(r'/Users/apple888/PycharmProjects/proxy IP')
+        if os.path.exists('host.txt'):
+            self.con_serial_house('代理IP文件已存在,马上进入筛选......')
+            lock.release()
+        else:
+            api = 'https://www.xicidaili.com/nn/{}'
+            header = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) AppleWebKit/'
+                        '537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'}
+            fp = open('C:\\Users\\49394\\Desktop\\ccc\\host.txt', 'a+', encoding=('utf-8'))
+            for i in range(num+1):
+                api = api.format(1)
+                respones = requests.get(url=api, headers=header)
+                soup = BeautifulSoup(respones.text, 'lxml')
+                container = soup.find_all(name='tr',attrs={'class':'odd'})
+                for tag in container:
+                    try:
+                        con_soup = BeautifulSoup(str(tag),'lxml')
+                        td_list = con_soup.find_all('td')
+                        ip = str(td_list[1])[4:-5]
+                        port = str(td_list[2])[4:-5]
+                        IPport = ip + '\t' + port + '\n'
+                        fp.write(IPport)
+                        self.con_serial_house('正在写入代理IP,请稍后:{}'.format(IPport))
+                        cursor = self.textBrowser_play.textCursor()
+                        self.textBrowser_play.moveCursor(cursor.End)
+                    except Exception as e:
+                        print('No IP！')
+                time.sleep(1)
+            fp.close()
+            lock.release()
+
+    def test_proxy(self):
+        lock.acquire()
+        global proxys_use
+        #os.chdir(r'/Users/apple888/PycharmProjects/proxy IP')
+        url = 'https://www.baidu.com'
+        fp = open('host.txt', 'r')
+        ips = fp.readlines()
+        proxys = list()
+        for p in ips:
+            ip = p.strip('\n').split('\t')
+            proxy = 'http:\\' + ip[0] + ':' + ip[1]
+            proxies = {'proxy': proxy}
+            proxys.append(proxies)
+        for pro in proxys:
+            try:
+                s = requests.get(url, proxies=pro)
+                self.con_serial_house('正在筛选可用代理IP:{} 状态:{}'.format(pro['proxy'],s.status_code))
+                #cursor = self.textBrowser_play.textCursor()
+                #self.textBrowser_play.moveCursor(cursor.End)
+                if s.status_code == 200:
+                    proxys_use.append(pro)
+            except Exception:
+                pass
+        lock.release()
+
+
     def con_serial_house(self,message):
         self.textBrowser_play.append(message)
+        #cursor = self.textBrowser_play.textCursor()
+        #self.textBrowser_play.moveCursor(cursor.End)
 
     def con_jindu(self,timers):
         self.step += timers
         self.progressBar_play.setTextVisible(self.step)
         self.progressBar_play.setValue(self.step)
     def search_house(self,ak, address='广州', work='珠江城大厦',pages=1, huxin = '一居', home_page=1,juli_1='6',money_house='2600'):
+        lock.acquire()
         global starttime
         starttime = time.strftime("%Y-%M-%d-%H-%M-%S", time.localtime(time.time()))
         global HOUSE_NUMBER
@@ -160,7 +226,14 @@ class slot_con(QtGui.QWidget, Ui_Form):
         headers['User-Agent'] = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36'
         for page in range(pages):
             url = '{0}{1}{2}'.format(URL_TOP,ADDRESS[str(address)],page+1) # NUM是多少就爬第几页的
-            beike_data = requests.get(url)
+            '''
+            while 1:
+                proxies = self.get_ip_list(headers)
+                if proxies:
+                    print('proxies=',proxies)
+                    break
+            '''
+            beike_data = requests.get(url,headers=headers, proxies=proxys_use[random.randint(0,len(proxys_use)-1)])
             soup = BeautifulSoup(beike_data.text,'lxml') # lxml格式
             links = soup.select('div.content__item > a') # 处理异步加载数据
             for link, in zip(links):
@@ -176,7 +249,7 @@ class slot_con(QtGui.QWidget, Ui_Form):
             if house_list == 0:
                 for m in range(home_page):
                     link = link + 'pg' + str(m+1) + HUXIN[huxin]
-                    house_data = requests.get(link)
+                    house_data = requests.get(link,proxies=proxys_use[random.randint(0,len(proxys_use)-1)])
                     soup = BeautifulSoup(house_data.text,'lxml')
                     home_titles = soup.select('div.content__item__main > p:nth-of-type(1)') # nth-of-type(1)表示找到该div下的第一个p
                     home_addresss = soup.select('div.content__item__main > p:nth-of-type(2)')
@@ -192,16 +265,17 @@ class slot_con(QtGui.QWidget, Ui_Form):
                             home_all[one_home_title] = ['url直达：'+ URL_TOP + one_home_url,
                                                         '直线距离:'+str(juli)+'KM',
                                                         one_home_money.split(' ')[0]+'元/月']
-                            self.con_serial_house('{0}-{1}'.format(one_home_title, 'url直达：'+ URL_TOP + one_home_url+'-'+'直线距离:'+str(juli)+'KM'+one_home_money.split(' ')[0]+'元/月'))
-
+                            self.con_serial_house('{0}-{1}'.format(one_home_title, '-url直达:'+ URL_TOP + one_home_url+' 直线距离:'+str(juli)+' 公里'+' 月租金:'+ one_home_money.split(' ')[0]+' 元/月'))
+                            #cursor = self.textBrowser_play.textCursor()
+                            #self.textBrowser_play.moveCursor(cursor.End)
                             with open('D:/户型查找'+CITY+str(MONEY)+str(NUM)+starttime+'.txt','a') as fg:
-                                fg.write(str(one_home_title)+'-'+str('url直达：'+ URL_TOP + one_home_url+'-'+'直线距离:'+str(juli)+'KM'+one_home_money.split(' ')[0]+'元/月')+'\n')                        
+                                fg.write(str(one_home_title)+'-'+str('url直达：'+ URL_TOP + one_home_url+'-'+'直线距离:'+str(juli)+' KM'+one_home_money.split(' ')[0]+'元/月')+'\n')                        
                         HOUSE_NUMBER += 1
             else: #在这里处理除开自如，其他的房屋
                 apartment_links = {} #每个公寓的各个区域的url
                 for m in range(home_page):
                     link = link + 'pg' + str(m+1) # 这里是公寓的区域分布
-                    house_data = requests.get(link)
+                    house_data = requests.get(link,headers=headers, proxies=proxys_use[random.randint(0,len(proxys_use)-1)])
                     soup = BeautifulSoup(house_data.text,'lxml')
                     apartment_urls = soup.select('div.flat_item_card > a:nth-of-type(1)') # 第一个a标签
                     apartment_titles = soup.select('p.flat_item_card_title')
@@ -211,7 +285,7 @@ class slot_con(QtGui.QWidget, Ui_Form):
                         apartment_links[my_apartment_title] = URL_TOP + apartment_link
                 for a_title,a_url in apartment_links.items(): #每个区域具体公寓的地址
                     for m in range(home_page):
-                        apartment_data = requests.get(a_url)
+                        apartment_data = requests.get(a_url,headers=headers, proxies=proxys_use[random.randint(0,len(proxys_use)-1)])
                         html = apartment_data.text
                         bf = BeautifulSoup(html,features="html5lib")
                         apartment_texts = bf.find_all("div", class_ = "flat_detail_renting_item")
@@ -266,12 +340,14 @@ class slot_con(QtGui.QWidget, Ui_Form):
                                                         str(price)+'元/月']
                                 #self.textBrowser_other_show.append(_translate("From", starttime + message, None))
                                 #self.textBrowser_play.append(_translate("From", '{0}-{1}'.format(str(paartment_address[0].text)+home_title_zz, 'url直达：'+ URL_TOP + list_name[zz]+'-'+'直线距离:'+str(juli)+'KM'+ str(price)+'元/月'), None))
-                                self.con_serial_house('{0}-{1}'.format(str(paartment_address[0].text)+home_title_zz, 'url直达：'+ URL_TOP + list_name[zz]+'-'+'直线距离:'+str(juli)+'KM'+ str(price)+'元/月'))
-
+                                self.con_serial_house('{0}-{1}'.format(str(paartment_address[0].text)+home_title_zz, '-url直达:'+ URL_TOP + list_name[zz]+' 直线距离:'+str(juli)+' 公里 '+'月租金:'+ str(price)+' 元/月'))
+                                #cursor = self.textBrowser_play.textCursor()
+                                #self.textBrowser_play.moveCursor(cursor.End)
                                 with open('D:/户型查找'+CITY+str(MONEY)+str(NUM)+starttime+'.txt','a') as fg:
-                                        if '\u2764' in str(paartment_address[0].text)+home_title_zz:
-                                            str(paartment_address[0].text)+home_title_zz.replace('\u2764','')
-                                        fg.write(str(str(paartment_address[0].text)+home_title_zz)+'-'+str('url直达:'+ URL_TOP + list_name[zz]+' '+'直线距离约:'+str(juli)+'公里'+' '+'租金:'+ str(price)+'元/月')+'\n')
+                                        try:
+                                            fg.write(str(str(paartment_address[0].text)+home_title_zz)+'-'+str('url直达:'+ URL_TOP + list_name[zz]+' '+'直线距离约:'+str(juli)+'公里'+' '+'租金:'+ str(price)+'元/月')+'\n')
+                                        except UnicodeEncodeError: # 去除某些特殊符号
+                                            pass
                             zz += 1
                             HOUSE_NUMBER += 1
             house_list = 1
@@ -279,12 +355,18 @@ class slot_con(QtGui.QWidget, Ui_Form):
         MYHOUSE_NUMBER = len(home_all)
         self.con_serial('共检索到{0}套房屋，其中{1}套符合设置的要求，已在右侧显示！'.format(HOUSE_NUMBER,MYHOUSE_NUMBER),0)
         self.con_serial('或者您也可以查看本地文件，房屋文件保存在:{}'.format('D:/户型查找'+CITY+str(MONEY)+str(NUM)+starttime+'.txt'),0)
+        lock.release()
 
     def con_serial(self,message,flag=1):
-        if flag:
+        if flag:#_translate("From", starttime + message, None)
+            #self.textBrowser_other_show.append(_translate("From", starttime + message, None))
             self.textBrowser_display.append(message + '：保存成功\n')
+            cursor = self.textBrowser_display.textCursor()
+            self.textBrowser_display.moveCursor(cursor.End)
         else:
             self.textBrowser_display.append(message)
+            cursor = self.textBrowser_display.textCursor()
+            self.textBrowser_display.moveCursor(cursor.End)
 
 
     @QtCore.pyqtSignature("")
@@ -357,7 +439,11 @@ class slot_con(QtGui.QWidget, Ui_Form):
 
     @QtCore.pyqtSignature("")
     def on_pushButton_search_clicked(self):
-        po = threading.Thread(target=self.search_house,args=[AK, CITY, WORK, HOMES, NUM, HOUSES, JULI, MONEY],daemon=True) # 多线程
+        p1 = threading.Thread(target=self.fetch_proxy, daemon=True) # 利用lock使线程一个一个执行
+        p1.start()
+        p2 = threading.Thread(target=self.test_proxy, daemon=True)
+        p2.start()
+        po = threading.Thread(target=self.search_house, args=[AK, CITY, WORK, HOMES, NUM, HOUSES, JULI, MONEY], daemon=True) # 多线程
         po.start()
 
 
@@ -382,9 +468,3 @@ if __name__ == "__main__":
     w.graphical_intf()
     widget.show()
     sys.exit(app.exec_())
-
-
-
-
-
-
