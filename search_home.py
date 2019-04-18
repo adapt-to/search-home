@@ -11,7 +11,11 @@ import html5lib
 CITY = ''
 WORK = ''
 NUM = ''
-AK = [] # 加入ak码
+AK = ['93c85a8c660003ff2fd31b31124aa54e',
+        'dbf442a9a40409c020ff962e3af9fec1',
+        '0dd6021c09bae0e5e424b92a3b20f164',
+        '8c74fbf8d2975690fe9974891dc2c0b5',
+        'f62f104698bf146e67b65439892a2f3b'] # 加入ak码
 MONEY = ''
 JULI = ''
 HOMES = '' # 查询公寓页数
@@ -20,7 +24,7 @@ HOUSE_NUMBER = 0 # 记录检索到的房子数目
 MYHOUSE_NUMBER = 0 # 符合要求的房子数目
 HOUSE_NUMBER_SET = 0 # 查找的公寓数量（一页20个还是太多了，可以在这里筛选）
 starttime = ''
-from juli_style import *
+from juli_style_relode import *
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
 except AttributeError:
@@ -39,6 +43,21 @@ class slot_con(QtGui.QWidget, Ui_Form):
         self.setupUi(self)
         self.calibration_status = False
         self.parameter_status = False
+        self.lineEdit_city.setPlaceholderText('支持所有一线及部分二线城市')
+        self.lineEdit_work.setPlaceholderText('工作地点,精确到街道号或楼名')
+        self.lineEdit_home.setPlaceholderText('例如:一居、二居等')
+        self.lineEdit_juli.setPlaceholderText('注意是与工作地点的直线距离')
+        self.lineEdit_ak.setPlaceholderText('填入高德地图ak码，多个可用英文逗号隔开')
+        self.lineEdit_ak.setEchoMode(QtGui.QLineEdit.PasswordEchoOnEdit) # 失焦则为圆点显示
+        self.lineEdit_money.setPlaceholderText('只填入数字')
+        self.lineEdit_homes.setPlaceholderText('填入页数')
+        self.lineEdit_HOUSE_NUMBER_SET.setPlaceholderText('若20太多则写其他数字')
+        self.lineEdit_houses.setPlaceholderText('查找的房型页数')
+        self.progressBar_play.setRange(0, 100)
+        self.step = 0
+        #self.timer = QtCore.QBasicTimer()
+        #pixMap = QtGui.QPixmap("wechat.png").scaled(self.label.width(), self.label.height())
+        #self.label_img.setPixmap(pixMap)
 
     def search_coordinate(self, address,ak):
         parameters = {'address': address, 'key': ak}
@@ -73,9 +92,9 @@ class slot_con(QtGui.QWidget, Ui_Form):
                             lon1, lat1 = self.search_coordinate(add_1,ak[4])
                             lon2, lat2 = self.search_coordinate(add_2,ak[4])
                         except RuntimeError:
-                            print('ak码额度已用完！请等待')
+                            #print('ak码额度已用完！请等待')
                             #self.textBrowser_display.append('ak码额度已用完！请添加ak码或第二天再试！')
-                            self.con_serial_house('ak码额度已用完！请添加ak码或第二天再试！')
+                            self.con_serial('ak码额度已用完！请添加ak码或第二天再试！',0)
         lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])  # 将十进制度数转化为弧度
         # Haversine公式，求球面两点距离
         dlon = lon2 - lon1
@@ -89,6 +108,10 @@ class slot_con(QtGui.QWidget, Ui_Form):
     def con_serial_house(self,message):
         self.textBrowser_play.append(message)
 
+    def con_jindu(self,timers):
+        self.step += timers
+        self.progressBar_play.setTextVisible(self.step)
+        self.progressBar_play.setValue(self.step)
     def search_house(self,ak, address='广州', work='珠江城大厦',pages=1, huxin = '一居', home_page=1,juli_1='6',money_house='2600'):
         global starttime
         starttime = time.strftime("%Y-%M-%d-%H-%M-%S", time.localtime(time.time()))
@@ -97,6 +120,7 @@ class slot_con(QtGui.QWidget, Ui_Form):
         HOUSE_NUMBER = 0
         house = dict()  # 存储查找的 公寓title和link
         home_all = dict() # 符合要求的房子
+        timers = 2*int(pages)*int(home_page)*int(HOUSE_NUMBER_SET) / 100
          # pages公寓数，一页是20个公寓
          # home_page公寓查找多少页，一页是20个房型
         URL_TOP = 'https://m.ke.com/' # 头部地址
@@ -167,11 +191,13 @@ class slot_con(QtGui.QWidget, Ui_Form):
                         one_home_money = home_money.get_text().strip() # 房子价格
                         one_home_url = home_url.get('href')
                         juli = float(self.Haversine(address+'市'+one_home_title.split(' ')[0].split('·')[-1],address+'市'+work,ak))
+                        self.con_jindu(timers)
                         if juli < float(juli_1) and float(one_home_money.split(' ')[0]) < float(money_house):
                             home_all[one_home_title] = ['url直达：'+ URL_TOP + one_home_url,
                                                         '直线距离:'+str(juli)+'KM',
                                                         one_home_money.split(' ')[0]+'元/月']
                             self.con_serial_house('{0}-{1}'.format(one_home_title, 'url直达：'+ URL_TOP + one_home_url+'-'+'直线距离:'+str(juli)+'KM'+one_home_money.split(' ')[0]+'元/月'))
+
                             with open('D:/户型查找'+CITY+str(MONEY)+str(NUM)+starttime+'.txt','a') as fg:
                                 fg.write(str(one_home_title)+'-'+str('url直达：'+ URL_TOP + one_home_url+'-'+'直线距离:'+str(juli)+'KM'+one_home_money.split(' ')[0]+'元/月')+'\n')                        
                         HOUSE_NUMBER += 1
@@ -232,18 +258,20 @@ class slot_con(QtGui.QWidget, Ui_Form):
                             address_apartment = address+'市'+str(paartment_address[0].text)
 
                             juli = float(self.Haversine(address_apartment,address+'市'+work,ak))
+                            self.con_jindu(timers)
                             if juli < float(juli_1) and float(price) < float(money_house):
                                 if ' ' in list_home_title[zz]:
                                     home_title_zz = '-[{0}]-[{1}]'.format(list_home_title[zz].split(' ')[0],list_home_title[zz].split(' ')[-1])
                                 else: # list_home_title[zz]
                                     home_title_zz = '-[{0}]-[仅{1}]'.format(list_home_title[zz].split('仅')[0],list_home_title[zz].split('仅')[-1])
-                                print(address_apartment+home_title_zz) # 房屋名称
+                                #print(address_apartment+home_title_zz) # 房屋名称
                                 home_all[str(paartment_address[0].text)+home_title_zz] = ['url直达：'+ URL_TOP + list_name[zz],
                                                         '直线距离:'+str(juli)+'KM',
                                                         str(price)+'元/月']
                                 #self.textBrowser_other_show.append(_translate("From", starttime + message, None))
                                 #self.textBrowser_play.append(_translate("From", '{0}-{1}'.format(str(paartment_address[0].text)+home_title_zz, 'url直达：'+ URL_TOP + list_name[zz]+'-'+'直线距离:'+str(juli)+'KM'+ str(price)+'元/月'), None))
                                 self.con_serial_house('{0}-{1}'.format(str(paartment_address[0].text)+home_title_zz, 'url直达：'+ URL_TOP + list_name[zz]+'-'+'直线距离:'+str(juli)+'KM'+ str(price)+'元/月'))
+
                                 with open('D:/户型查找'+CITY+str(MONEY)+str(NUM)+starttime+'.txt','a') as fg:
                                         if '\u2764' in str(paartment_address[0].text)+home_title_zz:
                                             str(paartment_address[0].text)+home_title_zz.replace('\u2764','')
@@ -253,15 +281,20 @@ class slot_con(QtGui.QWidget, Ui_Form):
             house_list = 1
             house_number_set += 1
         MYHOUSE_NUMBER = len(home_all)
-        self.con_serial_house('共检索到{0}套房屋，其中{1}套符合设置的要求，已在上述显示！'.format(HOUSE_NUMBER,MYHOUSE_NUMBER))
-        self.con_serial_house('租房信息保存在:{}'.format('D:/户型查找'+CITY+str(MONEY)+str(NUM)+starttime+'.txt'))
+        self.con_serial('共检索到{0}套房屋，其中{1}套符合设置的要求，已在右侧显示！'.format(HOUSE_NUMBER,MYHOUSE_NUMBER),0)
+        self.con_serial('或者您也可以查看本地文件，房屋文件保存在:{}'.format('D:/户型查找'+CITY+str(MONEY)+str(NUM)+starttime+'.txt'),0)
 
-    def con_serial(self,message):
-        self.textBrowser_display.append(message + '：保存成功\n')
+    def con_serial(self,message,flag=1):
+        if flag:
+            self.textBrowser_display.append(message + '：保存成功\n')
+        else:
+            self.textBrowser_display.append(message)
+
 
     @QtCore.pyqtSignature("")
     def on_pushButton_city_clicked(self):
         global CITY
+
         city = self.lineEdit_city.text()
         if city[-1] == '市':
             self.textBrowser_display.append('保存失败，城市名不需要添加 ‘市’ ！\n')
@@ -322,9 +355,17 @@ class slot_con(QtGui.QWidget, Ui_Form):
             HOUSE_NUMBER_SET = int(house_set)
 
     @QtCore.pyqtSignature("")
+    def on_pushButton_jindutiao_clicked(self):
+        #self.timer.start(1, self)
+        pass
+
+    @QtCore.pyqtSignature("")
     def on_pushButton_search_clicked(self):
         po = threading.Thread(target=self.search_house,args=[AK, CITY, WORK, HOMES, NUM, HOUSES, JULI, MONEY],daemon=True) # 多线程
         po.start()
+
+
+
 
 class slot(QtGui.QMainWindow):
     def __init__(self,ui,tab):
@@ -332,16 +373,22 @@ class slot(QtGui.QMainWindow):
         self.tab = tab
     def graphical_intf(self):
         self.con = slot_con(self.tab)
-        self.con.setGeometry(QtCore.QRect(0, 0, 1410, 950))
+        self.con.setGeometry(QtCore.QRect(0, 0, 1200, 800))
 
 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
     widget = QtGui.QTabWidget()
-    widget.resize(1410, 950)
+    widget.resize(1200,800)
     a = QtGui.QFrame(widget)
-    a.setGeometry(QtCore.QRect(0, 0, 1410, 950))
+    a.setGeometry(QtCore.QRect(0, 0, 1200, 800))
     w = slot(widget, a)
     w.graphical_intf()
     widget.show()
     sys.exit(app.exec_())
+
+
+
+
+
+
