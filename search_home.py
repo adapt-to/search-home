@@ -134,8 +134,8 @@ class slot_con(QtGui.QWidget, Ui_Form):
                         IPport = ip + '\t' + port + '\n'
                         fp.write(IPport)
                         self.con_serial_house('正在写入代理IP,请稍后:{}'.format(IPport))
-                        cursor = self.textBrowser_play.textCursor()
-                        self.textBrowser_play.moveCursor(cursor.End)
+                        #cursor = self.textBrowser_play.textCursor()
+                        #self.textBrowser_play.moveCursor(cursor.End)
                     except Exception as e:
                         print('No IP！')
                 time.sleep(1)
